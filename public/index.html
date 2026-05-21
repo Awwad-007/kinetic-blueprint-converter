@@ -1,0 +1,895 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>KINETIC — Blueprint Converter</title>
+  <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Orbitron:wght@700;900&family=Rajdhani:wght@400;600&display=swap" rel="stylesheet" />
+  <style>
+    /* ─── RESET & BASE ─────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:       #030303;
+      --panel:    #070909;
+      --card:     #0d1410;
+      --border:   #0d2218;
+      --neon:     #00ff41;
+      --neon-dim: #00b82e;
+      --neon-drk: #004d13;
+      --red:      #ff003c;
+      --amber:    #ff9500;
+      --blue:     #00c8ff;
+      --mid:      #4a7a58;
+      --dim:      #2a4a35;
+      --mono:     'Share Tech Mono', monospace;
+      --display:  'Orbitron', sans-serif;
+      --body:     'Rajdhani', sans-serif;
+    }
+
+    html, body {
+      width: 100%; height: 100%;
+      background: var(--bg);
+      color: var(--neon);
+      font-family: var(--mono);
+      font-size: 12px;
+      overflow: hidden;
+    }
+
+    ::-webkit-scrollbar { width: 4px; }
+    ::-webkit-scrollbar-track { background: var(--bg); }
+    ::-webkit-scrollbar-thumb { background: var(--neon-drk); border-radius: 2px; }
+
+    /* ─── HEADER ───────────────────────────────────────── */
+    header {
+      position: fixed; top: 0; left: 0; right: 0; height: 52px;
+      background: linear-gradient(90deg, #000a04, #020b06, #000);
+      border-bottom: 1px solid var(--neon-drk);
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 0 20px; z-index: 100;
+      box-shadow: 0 0 30px rgba(0,255,65,0.06);
+    }
+
+    .logo { display: flex; align-items: center; gap: 10px; }
+    .logo-icon {
+      font-size: 20px; color: var(--neon);
+      filter: drop-shadow(0 0 8px var(--neon));
+      animation: spin 10s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .logo-text {
+      font-family: var(--display); font-size: 16px; font-weight: 900;
+      letter-spacing: 5px;
+      text-shadow: 0 0 20px var(--neon), 0 0 40px rgba(0,255,65,0.3);
+    }
+    .logo-sub {
+      font-size: 9px; letter-spacing: 2px; color: var(--mid);
+      border-left: 1px solid var(--neon-drk); padding-left: 12px;
+    }
+
+    .header-right { display: flex; align-items: center; gap: 14px; }
+
+    .status-dot {
+      width: 8px; height: 8px; border-radius: 50%;
+      background: var(--dim); box-shadow: none;
+      transition: all 0.4s;
+    }
+    .status-dot.ready { background: var(--neon); box-shadow: 0 0 8px var(--neon); animation: pulse 2s infinite; }
+    .status-dot.error { background: var(--red);  box-shadow: 0 0 8px var(--red); }
+    .status-dot.busy  { background: var(--amber); box-shadow: 0 0 8px var(--amber); animation: pulse 0.5s infinite; }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.3} }
+
+    .status-label { font-size: 9px; letter-spacing: 2px; color: var(--mid); }
+
+    /* ─── LAYOUT ───────────────────────────────────────── */
+    main {
+      position: fixed; top: 52px; bottom: 0; left: 0; right: 0;
+      display: grid;
+      grid-template-columns: 320px 1fr 300px;
+      overflow: hidden;
+    }
+
+    /* ─── PANELS ───────────────────────────────────────── */
+    .panel {
+      background: var(--panel);
+      overflow-y: auto;
+      border-right: 1px solid var(--border);
+      display: flex; flex-direction: column; gap: 0;
+    }
+    .panel:last-child { border-right: none; border-left: 1px solid var(--border); }
+
+    .section {
+      padding: 14px;
+      border-bottom: 1px solid var(--border);
+      position: relative;
+    }
+    .section::before {
+      content: '';
+      position: absolute; top: 0; left: 0; right: 0; height: 1px;
+      background: linear-gradient(90deg, transparent, var(--neon-drk), transparent);
+    }
+
+    .section-title {
+      font-family: var(--display); font-size: 8px; letter-spacing: 3px;
+      color: var(--neon-dim); margin-bottom: 12px;
+      text-shadow: 0 0 8px var(--neon-dim);
+    }
+
+    /* ─── DROPZONE ─────────────────────────────────────── */
+    #dropzone {
+      border: 1px dashed var(--neon-drk);
+      border-radius: 2px;
+      padding: 28px 16px;
+      text-align: center;
+      cursor: pointer;
+      transition: all 0.25s;
+      background: rgba(0,255,65,0.02);
+      position: relative;
+    }
+    #dropzone:hover, #dropzone.drag-over {
+      border-color: var(--neon);
+      background: rgba(0,255,65,0.06);
+      box-shadow: 0 0 20px rgba(0,255,65,0.1);
+    }
+    #dropzone.drag-over { transform: scale(1.01); }
+
+    .dz-icon { font-size: 32px; margin-bottom: 8px; opacity: 0.7; }
+    .dz-title { font-family: var(--display); font-size: 10px; letter-spacing: 2px; color: var(--neon-dim); }
+    .dz-sub { font-size: 9px; color: var(--mid); margin-top: 4px; }
+    .dz-types { font-size: 8px; color: var(--dim); margin-top: 6px; letter-spacing: 1px; }
+
+    #fileInput { display: none; }
+
+    .file-selected {
+      margin-top: 10px; padding: 8px;
+      border: 1px solid var(--neon-drk);
+      background: rgba(0,255,65,0.04);
+      font-size: 9px; color: var(--neon-dim);
+      display: none;
+    }
+    .file-selected.show { display: block; }
+
+    /* ─── FORM ─────────────────────────────────────────── */
+    .form-row { margin-bottom: 10px; }
+    .form-label { font-size: 8px; letter-spacing: 1.5px; color: var(--mid); margin-bottom: 4px; display: block; }
+
+    .form-input, .form-select {
+      width: 100%; padding: 7px 10px;
+      background: var(--card); border: 1px solid var(--border);
+      color: var(--neon); font-family: var(--mono); font-size: 11px;
+      outline: none; transition: border-color 0.2s;
+    }
+    .form-input:focus, .form-select:focus { border-color: var(--neon-drk); }
+    .form-select option { background: var(--card); }
+
+    /* ─── UPLOAD BUTTON ────────────────────────────────── */
+    .btn-upload {
+      width: 100%; padding: 10px;
+      font-family: var(--display); font-size: 9px; letter-spacing: 2px;
+      background: rgba(0,255,65,0.06); border: 1px solid var(--neon-drk);
+      color: var(--neon); cursor: pointer; transition: all 0.2s;
+      margin-top: 6px; text-transform: uppercase;
+    }
+    .btn-upload:hover:not(:disabled) {
+      background: rgba(0,255,65,0.14);
+      box-shadow: 0 0 16px rgba(0,255,65,0.2);
+    }
+    .btn-upload:disabled { opacity: 0.35; cursor: not-allowed; }
+
+    /* ─── PROGRESS BAR ─────────────────────────────────── */
+    .progress-wrap {
+      height: 3px; background: var(--border); border-radius: 2px;
+      margin-top: 8px; overflow: hidden; display: none;
+    }
+    .progress-wrap.show { display: block; }
+    .progress-bar {
+      height: 100%; width: 0%; background: var(--neon);
+      box-shadow: 0 0 8px var(--neon);
+      transition: width 0.4s ease;
+    }
+    .progress-label { font-size: 8px; color: var(--mid); margin-top: 4px; }
+
+    /* ─── FLOOR PREVIEW (center) ───────────────────────── */
+    #center { background: var(--bg); border: none; }
+
+    .center-header {
+      border-bottom: 1px solid var(--border);
+      padding: 10px 16px;
+      display: flex; align-items: center; justify-content: space-between;
+      background: var(--panel); flex-shrink: 0;
+    }
+    .floor-selector { display: flex; gap: 4px; }
+    .floor-btn {
+      font-family: var(--mono); font-size: 8px; padding: 4px 10px;
+      background: transparent; border: 1px solid var(--border);
+      color: var(--mid); cursor: pointer; transition: all 0.2s;
+    }
+    .floor-btn:hover, .floor-btn.active {
+      border-color: var(--neon); color: var(--neon);
+      background: rgba(0,255,65,0.05);
+    }
+
+    #previewCanvas {
+      display: block;
+      width: 100%; height: calc(100% - 44px);
+    }
+
+    .empty-state {
+      position: absolute; top: 50%; left: 50%;
+      transform: translate(-50%, -50%);
+      text-align: center; pointer-events: none;
+    }
+    .empty-icon { font-size: 48px; opacity: 0.15; margin-bottom: 12px; }
+    .empty-text { font-size: 9px; letter-spacing: 3px; color: var(--dim); }
+
+    /* ─── EXPORT BUTTONS ───────────────────────────────── */
+    .btn-export {
+      width: 100%; padding: 14px 10px;
+      font-family: var(--display); font-size: 9px; letter-spacing: 2px;
+      cursor: pointer; transition: all 0.25s;
+      text-transform: uppercase; position: relative; overflow: hidden;
+    }
+
+    .btn-kinetic {
+      background: rgba(0,255,65,0.06); border: 1px solid var(--neon-drk);
+      color: var(--neon); margin-bottom: 8px;
+    }
+    .btn-kinetic:hover:not(:disabled) {
+      background: rgba(0,255,65,0.18);
+      border-color: var(--neon);
+      box-shadow: 0 0 24px rgba(0,255,65,0.25);
+    }
+
+    .btn-svg {
+      background: rgba(0,200,255,0.05); border: 1px solid var(--blue-dim, #0080a0);
+      color: var(--blue);
+    }
+    .btn-svg:hover:not(:disabled) {
+      background: rgba(0,200,255,0.14);
+      border-color: var(--blue);
+      box-shadow: 0 0 24px rgba(0,200,255,0.2);
+    }
+
+    .btn-export:disabled { opacity: 0.3; cursor: not-allowed; }
+
+    .btn-desc {
+      font-family: var(--body); font-size: 10px; letter-spacing: 0.5px;
+      color: var(--mid); margin-top: 5px; line-height: 1.5;
+    }
+
+    /* ─── FLOOR SELECT FOR SVG EXPORT ─────────────────── */
+    .svg-floor-row { display: flex; gap: 6px; margin-bottom: 8px; align-items: center; }
+    .svg-floor-label { font-size: 8px; color: var(--mid); letter-spacing: 1px; white-space: nowrap; }
+
+    /* ─── PIPELINE RESULT ──────────────────────────────── */
+    .pipeline-result { margin-top: 10px; }
+    .pipeline-step {
+      display: flex; align-items: center; gap: 8px;
+      padding: 5px 8px; border-left: 2px solid var(--border);
+      font-size: 9px; color: var(--mid); margin-bottom: 3px;
+    }
+    .pipeline-step.ok  { border-color: var(--neon); color: var(--neon-dim); }
+    .pipeline-step.err { border-color: var(--red);  color: var(--red); }
+    .step-icon { flex-shrink: 0; font-size: 10px; }
+
+    /* ─── LOG PANEL ────────────────────────────────────── */
+    .log-list {
+      max-height: 220px; overflow-y: auto;
+      display: flex; flex-direction: column; gap: 3px;
+    }
+    .log-entry {
+      font-size: 8.5px; padding: 3px 6px;
+      border-left: 2px solid var(--border);
+      line-height: 1.5;
+    }
+    .log-entry.info  { border-color: var(--blue);     color: var(--mid); }
+    .log-entry.ok    { border-color: var(--neon-drk); color: var(--neon-dim); }
+    .log-entry.warn  { border-color: var(--amber);    color: var(--amber); }
+    .log-entry.error { border-color: var(--red);      color: var(--red); }
+
+    .log-ts { color: var(--dim); margin-right: 6px; }
+
+    /* ─── STATS CARDS ──────────────────────────────────── */
+    .stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+    .stat-card {
+      padding: 8px; border: 1px solid var(--border);
+      background: var(--card); text-align: center;
+    }
+    .stat-val { font-family: var(--display); font-size: 22px; color: var(--neon); display: block; }
+    .stat-lbl { font-size: 7px; letter-spacing: 1.5px; color: var(--mid); margin-top: 2px; display: block; }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="logo">
+    <span class="logo-icon">⬡</span>
+    <span class="logo-text">KINETIC</span>
+    <span class="logo-sub">BLUEPRINT CONVERTER v1.0</span>
+  </div>
+  <div class="header-right">
+    <span class="status-dot" id="statusDot"></span>
+    <span class="status-label" id="statusLabel">AWAITING FILE</span>
+  </div>
+</header>
+
+<main>
+
+  <!-- ══════════════ LEFT: UPLOAD + METADATA ══════════════ -->
+  <div class="panel">
+
+    <div class="section">
+      <div class="section-title">◈ BLUEPRINT FILE</div>
+      <div id="dropzone" onclick="document.getElementById('fileInput').click()">
+        <input type="file" id="fileInput" accept=".dxf,.ifc,.dwg" />
+        <div class="dz-icon">📐</div>
+        <div class="dz-title">DRAG FILE HERE</div>
+        <div class="dz-sub">or click to browse</div>
+        <div class="dz-types">ACCEPTED: .DXF &nbsp;·&nbsp; .IFC &nbsp;·&nbsp; .DWG</div>
+      </div>
+      <div class="file-selected" id="fileSelectedBadge">
+        <span id="fileSelectedName">—</span>
+        <span id="fileSelectedSize" style="float:right; color:var(--dim)"></span>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-title">◈ BUILDING METADATA</div>
+
+      <div class="form-row">
+        <label class="form-label">BUILDING NAME *</label>
+        <input class="form-input" id="buildingName" placeholder="e.g. KINETIC GRAND HOTEL" />
+      </div>
+      <div class="form-row">
+        <label class="form-label">ADDRESS</label>
+        <input class="form-input" id="buildingAddress" placeholder="Street, City" />
+      </div>
+      <div class="form-row">
+        <label class="form-label">FLOOR COUNT</label>
+        <input class="form-input" id="floorCount" type="number" min="1" max="200" placeholder="4" />
+      </div>
+      <div class="form-row">
+        <label class="form-label">TIMEZONE</label>
+        <select class="form-select" id="timezone">
+          <option value="UTC">UTC</option>
+          <option value="America/New_York">America/New_York</option>
+          <option value="America/Los_Angeles">America/Los_Angeles</option>
+          <option value="Europe/London">Europe/London</option>
+          <option value="Europe/Berlin">Europe/Berlin</option>
+          <option value="Asia/Dubai">Asia/Dubai</option>
+          <option value="Asia/Kolkata">Asia/Kolkata</option>
+          <option value="Asia/Singapore">Asia/Singapore</option>
+          <option value="Australia/Sydney">Australia/Sydney</option>
+        </select>
+      </div>
+
+      <button class="btn-upload" id="uploadBtn" disabled>
+        ⬆ PARSE BLUEPRINT
+      </button>
+
+      <div class="progress-wrap" id="progressWrap">
+        <div class="progress-bar" id="progressBar"></div>
+      </div>
+      <div class="progress-label" id="progressLabel"></div>
+    </div>
+
+    <div class="section">
+      <div class="section-title">◈ EXTRACTED STATS</div>
+      <div class="stats-grid">
+        <div class="stat-card">
+          <span class="stat-val" id="statFloors">—</span>
+          <span class="stat-lbl">FLOORS</span>
+        </div>
+        <div class="stat-card">
+          <span class="stat-val" id="statRooms">—</span>
+          <span class="stat-lbl">ROOMS</span>
+        </div>
+        <div class="stat-card">
+          <span class="stat-val" id="statDoors">—</span>
+          <span class="stat-lbl">DOORS</span>
+        </div>
+        <div class="stat-card">
+          <span class="stat-val" id="statHazards">—</span>
+          <span class="stat-lbl">HAZARD ZONES</span>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ══════════════ CENTER: FLOOR PLAN PREVIEW ══════════ -->
+  <div id="center" style="display:flex;flex-direction:column;position:relative;">
+    <div class="center-header">
+      <div style="font-family:var(--display);font-size:9px;letter-spacing:3px;color:var(--neon-dim)">
+        FLOOR PLAN PREVIEW
+      </div>
+      <div class="floor-selector" id="floorSelector"></div>
+    </div>
+
+    <canvas id="previewCanvas"></canvas>
+
+    <div class="empty-state" id="emptyState">
+      <div class="empty-icon">🏗</div>
+      <div class="empty-text">UPLOAD A BLUEPRINT TO PREVIEW</div>
+    </div>
+  </div>
+
+  <!-- ══════════════ RIGHT: EXPORT ACTIONS + LOG ══════════ -->
+  <div class="panel">
+
+    <div class="section">
+      <div class="section-title">◈ EXPORT TO KINETIC</div>
+      <button class="btn-export btn-kinetic" id="btnKinetic" disabled>
+        ⚡ EXPORT TO KINETIC
+      </button>
+      <div class="btn-desc">
+        Writes JSON asset into <code style="color:var(--neon-drk)">client/assets/floorplans/</code>
+        and seeds all PostgreSQL tables atomically in one transaction.
+      </div>
+
+      <div class="pipeline-result" id="kineticResult"></div>
+    </div>
+
+    <div class="section">
+      <div class="section-title">◈ EXPORT SVG DOCUMENT</div>
+
+      <div class="svg-floor-row">
+        <span class="svg-floor-label">TARGET FLOOR:</span>
+        <select class="form-select" id="svgFloorSelect" style="flex:1;padding:4px 8px;font-size:10px;">
+          <option value="1">Floor 1</option>
+        </select>
+      </div>
+
+      <button class="btn-export btn-svg" id="btnSvg" disabled>
+        ⬇ DOWNLOAD SVG BLUEPRINT
+      </button>
+      <div class="btn-desc">
+        Generates a high-resolution A1 vector document.
+        No database writes. Triggers an instant browser download.
+      </div>
+    </div>
+
+    <div class="section" style="flex:1;overflow:hidden;display:flex;flex-direction:column;">
+      <div class="section-title">◈ PIPELINE LOG</div>
+      <div class="log-list" id="logList"></div>
+    </div>
+
+  </div>
+
+</main>
+
+<script>
+/* ════════════════════════════════════════════════════════════
+   KINETIC Blueprint Converter — app.js (inlined)
+════════════════════════════════════════════════════════════ */
+
+const API = '';   // same origin (Express serves this file)
+
+/* ── DOM ── */
+const fileInput       = document.getElementById('fileInput');
+const dropzone        = document.getElementById('dropzone');
+const fileSelectedBadge = document.getElementById('fileSelectedBadge');
+const fileSelectedName  = document.getElementById('fileSelectedName');
+const fileSelectedSize  = document.getElementById('fileSelectedSize');
+const uploadBtn       = document.getElementById('uploadBtn');
+const progressWrap    = document.getElementById('progressWrap');
+const progressBar     = document.getElementById('progressBar');
+const progressLabel   = document.getElementById('progressLabel');
+const btnKinetic      = document.getElementById('btnKinetic');
+const btnSvg          = document.getElementById('btnSvg');
+const kineticResult   = document.getElementById('kineticResult');
+const logList         = document.getElementById('logList');
+const floorSelector   = document.getElementById('floorSelector');
+const svgFloorSelect  = document.getElementById('svgFloorSelect');
+const canvas          = document.getElementById('previewCanvas');
+const ctx             = canvas.getContext('2d');
+const emptyState      = document.getElementById('emptyState');
+const statusDot       = document.getElementById('statusDot');
+const statusLabel     = document.getElementById('statusLabel');
+
+/* ── State ── */
+let selectedFile  = null;
+let sessionData   = null;   // response from /api/upload
+let activeFloor   = 1;
+
+/* ════════════════════════
+   STATUS HELPERS
+════════════════════════ */
+function setStatus(type, text) {
+  statusDot.className = `status-dot ${type}`;
+  statusLabel.textContent = text;
+}
+
+function log(level, msg) {
+  const entry = document.createElement('div');
+  entry.className = `log-entry ${level}`;
+  const ts = new Date().toTimeString().slice(0, 8);
+  entry.innerHTML = `<span class="log-ts">${ts}</span>${msg}`;
+  logList.insertBefore(entry, logList.firstChild);
+  while (logList.children.length > 60) logList.removeChild(logList.lastChild);
+}
+
+function setProgress(pct, label) {
+  progressWrap.classList.add('show');
+  progressBar.style.width = pct + '%';
+  progressLabel.textContent = label || '';
+}
+
+function clearProgress() {
+  setTimeout(() => {
+    progressWrap.classList.remove('show');
+    progressBar.style.width = '0%';
+    progressLabel.textContent = '';
+  }, 1200);
+}
+
+/* ════════════════════════
+   FILE SELECTION
+════════════════════════ */
+function handleFileSelect(file) {
+  if (!file) return;
+  const ext = file.name.split('.').pop().toLowerCase();
+  if (!['dxf','ifc','dwg'].includes(ext)) {
+    log('error', `Unsupported file type: .${ext}`);
+    return;
+  }
+  selectedFile = file;
+  fileSelectedName.textContent = file.name;
+  fileSelectedSize.textContent = formatBytes(file.size);
+  fileSelectedBadge.classList.add('show');
+  uploadBtn.disabled = false;
+  log('info', `File selected: ${file.name} (${formatBytes(file.size)})`);
+  setStatus('', '');
+}
+
+fileInput.addEventListener('change', e => handleFileSelect(e.target.files[0]));
+
+dropzone.addEventListener('dragover',  e => { e.preventDefault(); dropzone.classList.add('drag-over'); });
+dropzone.addEventListener('dragleave', ()=> dropzone.classList.remove('drag-over'));
+dropzone.addEventListener('drop', e => {
+  e.preventDefault();
+  dropzone.classList.remove('drag-over');
+  handleFileSelect(e.dataTransfer.files[0]);
+});
+
+/* ════════════════════════
+   UPLOAD + PARSE
+════════════════════════ */
+uploadBtn.addEventListener('click', async () => {
+  if (!selectedFile) return;
+
+  uploadBtn.disabled = true;
+  btnKinetic.disabled = true;
+  btnSvg.disabled = true;
+  setStatus('busy', 'PARSING…');
+  log('info', `Uploading ${selectedFile.name}…`);
+  setProgress(10, 'Uploading…');
+
+  const formData = new FormData();
+  formData.append('blueprint',       selectedFile);
+  formData.append('buildingName',    document.getElementById('buildingName').value    || 'Unnamed Building');
+  formData.append('buildingAddress', document.getElementById('buildingAddress').value || '');
+  formData.append('floorCount',      document.getElementById('floorCount').value      || 1);
+  formData.append('timezone',        document.getElementById('timezone').value        || 'UTC');
+
+  try {
+    setProgress(30, 'Parsing geometry…');
+
+    const res  = await fetch(`${API}/api/upload`, { method: 'POST', body: formData });
+    const data = await res.json();
+
+    if (!res.ok) throw new Error(data.error || 'Upload failed');
+
+    setProgress(80, 'Normalizing coordinates…');
+    sessionData = data;
+
+    // Log server entries
+    (data.log || []).forEach(e => log(e.level || 'info', e.msg));
+
+    setProgress(100, 'Done.');
+    clearProgress();
+
+    // Update stats
+    const floors = data.floors || {};
+    const totalRooms   = Object.values(floors).reduce((n, f) => n + (f.rooms   || 0), 0);
+    const totalDoors   = Object.values(floors).reduce((n, f) => n + (f.doors   || 0), 0);
+    const totalHazards = Object.values(floors).reduce((n, f) => n + (f.hazards || 0), 0);
+
+    document.getElementById('statFloors').textContent  = Object.keys(floors).length;
+    document.getElementById('statRooms').textContent   = totalRooms;
+    document.getElementById('statDoors').textContent   = totalDoors;
+    document.getElementById('statHazards').textContent = totalHazards;
+
+    // Build floor selector buttons
+    buildFloorSelector(Object.keys(floors).map(Number).sort((a,b)=>a-b));
+
+    // Fetch normalized data for preview
+    await loadPreview();
+
+    btnKinetic.disabled = false;
+    btnSvg.disabled     = false;
+    uploadBtn.disabled  = false;
+    setStatus('ready', 'READY');
+    log('ok', `Parse complete — ${Object.keys(floors).length} floor(s) extracted.`);
+
+  } catch (err) {
+    log('error', `Upload error: ${err.message}`);
+    setStatus('error', 'PARSE ERROR');
+    clearProgress();
+    uploadBtn.disabled = false;
+  }
+});
+
+/* ════════════════════════
+   FLOOR SELECTOR + PREVIEW
+════════════════════════ */
+function buildFloorSelector(floorNums) {
+  floorSelector.innerHTML = '';
+  // Also rebuild SVG floor dropdown
+  svgFloorSelect.innerHTML = '';
+
+  floorNums.forEach(fn => {
+    const btn = document.createElement('button');
+    btn.className = 'floor-btn' + (fn === activeFloor ? ' active' : '');
+    btn.textContent = `F${fn}`;
+    btn.addEventListener('click', () => {
+      activeFloor = fn;
+      document.querySelectorAll('.floor-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      drawPreview(fn);
+    });
+    floorSelector.appendChild(btn);
+
+    const opt = document.createElement('option');
+    opt.value = fn;
+    opt.textContent = `Floor ${fn}`;
+    svgFloorSelect.appendChild(opt);
+  });
+
+  // Set default active floor
+  activeFloor = floorNums[0] || 1;
+}
+
+async function loadPreview() {
+  try {
+    const res  = await fetch(`${API}/api/preview`);
+    const data = await res.json();
+    if (!res.ok) return;
+    sessionData.fullFloors = data.floors;
+    drawPreview(activeFloor);
+  } catch (e) {
+    log('warn', 'Preview load failed — data may still be valid');
+  }
+}
+
+/* ════════════════════════
+   CANVAS PREVIEW RENDERER
+════════════════════════ */
+function drawPreview(floorNum) {
+  const floorData = sessionData?.fullFloors?.[floorNum];
+  emptyState.style.display = floorData ? 'none' : 'block';
+  if (!floorData) return;
+
+  const W = canvas.offsetWidth  * window.devicePixelRatio;
+  const H = canvas.offsetHeight * window.devicePixelRatio;
+  canvas.width  = W;
+  canvas.height = H;
+  ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
+
+  const cW = canvas.offsetWidth;
+  const cH = canvas.offsetHeight;
+  const PAD = 40;
+
+  /* Background */
+  ctx.fillStyle = '#040d07';
+  ctx.fillRect(0, 0, cW, cH);
+
+  /* Grid */
+  ctx.strokeStyle = '#0a1a10';
+  ctx.lineWidth = 0.5;
+  for (let x = 0; x < cW; x += 40) { ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,cH); ctx.stroke(); }
+  for (let y = 0; y < cH; y += 40) { ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(cW,y); ctx.stroke(); }
+
+  /* Map area */
+  const mX = v => PAD + v * (cW - PAD*2);
+  const mY = v => PAD + v * (cH - PAD*2);
+  const mW = v => v * (cW - PAD*2);
+  const mH = v => v * (cH - PAD*2);
+
+  /* Rooms */
+  for (const room of (floorData.rooms || [])) {
+    const rx = mX(room.x), ry = mY(room.y);
+    const rw = mW(room.w), rh = mH(room.h);
+    if (rw < 1 || rh < 1) continue;
+
+    const isHaz  = room.isHazard;
+    const isExit = room.isExit;
+
+    ctx.fillStyle = isHaz ? '#1a0505' : isExit ? '#0a1f10' : '#0a1410';
+    ctx.fillRect(rx, ry, rw, rh);
+
+    ctx.strokeStyle = isHaz ? '#ff003c' : isExit ? '#00ff41' : '#0d2218';
+    ctx.lineWidth = isHaz ? 1.5 : 1;
+    ctx.globalAlpha = 0.7;
+    ctx.strokeRect(rx, ry, rw, rh);
+    ctx.globalAlpha = 1;
+
+    /* Label */
+    const fontSize = Math.max(7, Math.min(14, rw * 0.14));
+    ctx.fillStyle   = isHaz ? '#ff003c' : isExit ? '#00ff41' : '#4a7a58';
+    ctx.globalAlpha = 0.8;
+    ctx.font        = `${fontSize}px 'Share Tech Mono', monospace`;
+    ctx.textAlign   = 'center';
+    ctx.textBaseline = 'middle';
+    const label = (room.label || '').slice(0, 20);
+    ctx.fillText(label, rx + rw/2, ry + rh/2);
+    ctx.globalAlpha = 1;
+  }
+
+  /* Walls */
+  ctx.strokeStyle = '#2a4a35';
+  ctx.lineWidth = 1.5;
+  for (const w of (floorData.walls || [])) {
+    if (!w.x1 && !w.x2) continue;
+    ctx.beginPath();
+    ctx.moveTo(mX(w.x1), mY(w.y1));
+    ctx.lineTo(mX(w.x2), mY(w.y2));
+    ctx.stroke();
+  }
+
+  /* Doors */
+  for (const door of (floorData.doors || [])) {
+    const dx = mX(door.x), dy = mY(door.y);
+    const sz = 8;
+    ctx.strokeStyle = door.locked ? '#ff003c' : '#00ff41';
+    ctx.lineWidth = door.locked ? 2.5 : 1.5;
+    ctx.setLineDash(door.locked ? [] : [4,3]);
+    ctx.beginPath();
+    if (door.horiz) { ctx.moveTo(dx-sz, dy); ctx.lineTo(dx+sz, dy); }
+    else            { ctx.moveTo(dx, dy-sz); ctx.lineTo(dx, dy+sz); }
+    ctx.stroke();
+    ctx.setLineDash([]);
+  }
+
+  /* Exits */
+  ctx.fillStyle = '#00ff41';
+  ctx.globalAlpha = 0.5;
+  for (const exit of (floorData.exits || [])) {
+    const ex = mX(exit.x), ey = mY(exit.y);
+    ctx.beginPath();
+    ctx.arc(ex, ey, 5, 0, Math.PI*2);
+    ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+
+  /* Floor label overlay */
+  ctx.fillStyle   = '#00ff41';
+  ctx.globalAlpha = 0.4;
+  ctx.font        = "bold 9px 'Share Tech Mono'";
+  ctx.textAlign   = 'left';
+  ctx.textBaseline = 'top';
+  ctx.fillText(`FLOOR ${floorNum} — PREVIEW`, 8, 8);
+  ctx.fillText(`${(floorData.rooms||[]).length} ROOMS | ${(floorData.doors||[]).length} DOORS | ${(floorData.exits||[]).length} EXITS`, 8, 20);
+  ctx.globalAlpha = 1;
+}
+
+/* Resize canvas when window resizes */
+const resizeObserver = new ResizeObserver(() => {
+  if (sessionData?.fullFloors) drawPreview(activeFloor);
+});
+resizeObserver.observe(document.getElementById('center'));
+
+/* ════════════════════════
+   EXPORT TO KINETIC (Button 1)
+════════════════════════ */
+btnKinetic.addEventListener('click', async () => {
+  if (!sessionData) return;
+
+  btnKinetic.disabled = true;
+  kineticResult.innerHTML = '';
+  setStatus('busy', 'EXPORTING…');
+  log('info', '— KINETIC EXPORT STARTED —');
+
+  addPipelineStep(kineticResult, 'info', 'Building KINETIC JSON…');
+
+  try {
+    const res  = await fetch(`${API}/api/export/kinetic`, { method: 'POST' });
+    const data = await res.json();
+
+    if (!res.ok) throw new Error(data.error);
+
+    kineticResult.innerHTML = '';
+    (data.pipeline || []).forEach(step => {
+      addPipelineStep(kineticResult, step.status === 'ok' ? 'ok' : 'err',
+        formatPipelineStep(step));
+    });
+
+    log('ok', `JSON written → ${data.assetPath}`);
+    log('ok', `DB seeded — Building ID: ${data.buildingId}`);
+    setStatus('ready', 'EXPORTED');
+
+  } catch (err) {
+    addPipelineStep(kineticResult, 'err', `FAILED: ${err.message}`);
+    log('error', `Kinetic export failed: ${err.message}`);
+    setStatus('error', 'EXPORT FAILED');
+  } finally {
+    btnKinetic.disabled = false;
+  }
+});
+
+function addPipelineStep(container, status, msg) {
+  const el = document.createElement('div');
+  el.className = `pipeline-step ${status}`;
+  el.innerHTML = `<span class="step-icon">${status === 'ok' ? '✓' : status === 'err' ? '✕' : '○'}</span> ${msg}`;
+  container.appendChild(el);
+}
+
+function formatPipelineStep(step) {
+  if (step.step === 'JSON built')   return `JSON built — ${step.rooms} rooms`;
+  if (step.step === 'JSON written') return `Wrote → ${step.path?.split('/').slice(-2).join('/')}`;
+  if (step.step === 'DB seeded')    return `DB seeded — ${step.rooms} rooms, ${step.doors} doors`;
+  return step.step;
+}
+
+/* ════════════════════════
+   EXPORT SVG (Button 2)
+════════════════════════ */
+btnSvg.addEventListener('click', async () => {
+  if (!sessionData) return;
+
+  const floor = svgFloorSelect.value || 1;
+  btnSvg.disabled = true;
+  setStatus('busy', 'GENERATING SVG…');
+  log('info', `Generating SVG for Floor ${floor}…`);
+
+  try {
+    const res = await fetch(`${API}/api/export/svg`, {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ floor }),
+    });
+
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.error || 'SVG generation failed');
+    }
+
+    /* Trigger browser download from streamed SVG body */
+    const blob     = await res.blob();
+    const url      = URL.createObjectURL(blob);
+    const a        = document.createElement('a');
+    const filename = res.headers.get('Content-Disposition')?.match(/filename="([^"]+)"/)?.[1]
+                     || `KINETIC_Floor${floor}.svg`;
+    a.href     = url;
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(url);
+
+    log('ok', `SVG downloaded — ${filename}`);
+    setStatus('ready', 'SVG READY');
+
+  } catch (err) {
+    log('error', `SVG export failed: ${err.message}`);
+    setStatus('error', 'SVG FAILED');
+  } finally {
+    btnSvg.disabled = false;
+  }
+});
+
+/* ════════════════════════
+   UTILITIES
+════════════════════════ */
+function formatBytes(b) {
+  if (b < 1024) return b + ' B';
+  if (b < 1024*1024) return (b/1024).toFixed(1) + ' KB';
+  return (b/1024/1024).toFixed(1) + ' MB';
+}
+
+/* Init log */
+log('info', 'KINETIC Blueprint Converter ready.');
+log('info', 'Upload a .DXF, .IFC, or .DWG file to begin.');
+</script>
+
+</body>
+</html>
